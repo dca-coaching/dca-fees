@@ -1,0 +1,1521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#060c10">
+  <title>DCA Fees Manager</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+<style>
+:root{
+  --bg:#060c10;--s1:#0d1820;--s2:#152030;--s3:#1c2a3e;
+  --bdr:rgba(255,255,255,.07);--bdr2:rgba(255,255,255,.13);
+  --gold:#f5a020;--gold-d:rgba(245,160,32,.12);
+  --text:#ddeeff;--muted:#4a6a88;--sub:#7a9ab8;
+  --red:#f04060;--red-d:rgba(240,64,96,.12);
+  --orange:#ff8c42;--ora-d:rgba(255,140,66,.12);
+  --green:#2de090;--grn-d:rgba(45,224,144,.12);
+  --grey:#7a8a99;
+  --st:env(safe-area-inset-top,0px);--sb:env(safe-area-inset-bottom,0px);
+}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);height:100dvh;overflow:hidden;-webkit-font-smoothing:antialiased}
+::-webkit-scrollbar{width:2px}::-webkit-scrollbar-thumb{background:var(--s3);border-radius:2px}
+
+/* ══ INTRO ══════════════════════════ */
+#intro{
+  position:fixed;inset:0;z-index:999;overflow:hidden;
+  background:radial-gradient(ellipse 120% 75% at 50% 58%,#0c2a14 0%,#061408 55%,#020808 100%);
+  display:flex;align-items:center;justify-content:center;
+}
+#intro::before{content:'';position:absolute;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 44px,rgba(255,255,255,.013) 44px,rgba(255,255,255,.013) 46px);pointer-events:none}
+#intro::after{content:'';position:absolute;width:160vmax;height:160vmax;border:1px solid rgba(255,255,255,.025);border-radius:50%;top:50%;left:50%;transform:translate(-50%,-50%);box-shadow:0 0 0 28vmax rgba(255,255,255,.012)}
+#pitch{position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:68px;height:50%;background:linear-gradient(176deg,#c8b268 0%,#b89040 55%,#967018 100%);clip-path:polygon(18% 0%,82% 0%,100% 100%,0% 100%);opacity:.5}
+/* Crease lines on pitch */
+#pitch::before{content:'';position:absolute;top:10%;left:0;right:0;height:2px;background:rgba(255,255,255,.25)}
+#pitch::after{content:'';position:absolute;bottom:18%;left:0;right:0;height:2px;background:rgba(255,255,255,.25)}
+#stumps{position:absolute;bottom:6.5%;display:flex;gap:5px;align-items:flex-end}
+.stump{width:5px;height:40px;background:linear-gradient(180deg,#f0e080,#b08820);border-radius:2px 2px 0 0}
+.bails{position:absolute;top:-5px;left:-4px;display:flex;gap:3px}
+.bail{width:8px;height:5px;background:#f0e080;border-radius:2px}
+
+/* BAT - pale willow, black handle */
+#bat-wrap{
+  position:absolute;bottom:9%;right:5%;
+  transform-origin:83% 90%;
+  animation:batSwing .52s cubic-bezier(.15,.88,.32,1) .28s both;
+}
+@keyframes batSwing{0%{transform:rotate(58deg)}38%{transform:rotate(-34deg)}62%{transform:rotate(-23deg)}78%{transform:rotate(-26deg)}100%{transform:rotate(-24deg)}}
+
+/* BALL */
+#ball-wrap{position:absolute;animation:ballFly 3.6s cubic-bezier(.1,.85,.2,1) .52s both}
+#ball-svg{animation:ballSpin 3.6s ease-out .52s both;display:block}
+@keyframes ballFly{0%{transform:translate(95px,80px) scale(.04);opacity:0}5%{opacity:1}50%{transform:translate(0,0) scale(1.08)}65%{transform:translate(0,0) scale(.95)}75%{transform:translate(0,0) scale(1.02)}100%{transform:translate(0,0) scale(1)}}
+@keyframes ballSpin{0%{transform:rotate(0deg)}60%{transform:rotate(560deg)}100%{transform:rotate(720deg)}}
+#tagline{position:absolute;bottom:11.5%;font-family:'Bebas Neue',sans-serif;font-size:13px;letter-spacing:6px;color:rgba(255,255,255,.26);animation:tFade .7s ease 3.4s both}
+@keyframes tFade{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+.intro-out{animation:iOut .48s ease-in forwards!important}
+@keyframes iOut{to{opacity:0;transform:scale(1.04);pointer-events:none}}
+
+/* LOADING */
+#loading-screen{position:fixed;inset:0;z-index:900;background:var(--bg);display:none;align-items:center;justify-content:center;flex-direction:column;gap:14px}
+#loading-screen.show{display:flex}
+.spinner{width:36px;height:36px;border:3px solid var(--s3);border-top-color:var(--gold);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.load-txt{font-size:13px;color:var(--muted);letter-spacing:1px}
+
+/* SCREENS */
+.screen{position:fixed;inset:0;display:none;flex-direction:column;background:var(--bg);padding-top:var(--st)}
+.screen.active{display:flex}
+
+/* LOGIN */
+#login-screen{align-items:center;justify-content:center;padding:20px;padding-bottom:calc(var(--sb)+20px);overflow-y:auto;background:radial-gradient(ellipse 70% 40% at 50% 0%,rgba(245,160,32,.07) 0%,transparent 70%),var(--bg)}
+.lcard{width:100%;max-width:420px;background:var(--s1);border-radius:24px;padding:26px 20px 22px;border:1px solid var(--bdr2);box-shadow:0 20px 50px rgba(0,0,0,.6)}
+.bttl{font-family:'Bebas Neue',sans-serif;font-size:29px;letter-spacing:4px;color:var(--gold);line-height:1;margin-top:10px;text-align:center}
+.bsub{font-size:11px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-top:4px;text-align:center;margin-bottom:20px}
+
+/* FORMS */
+.lbl{display:block;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1.2px;margin-bottom:6px}
+.inp,.sel{width:100%;padding:13px 14px;background:var(--s2);border:1.5px solid var(--bdr);border-radius:12px;color:var(--text);font-size:16px;font-family:'Outfit',sans-serif;outline:none;transition:border-color .2s;-webkit-appearance:none;appearance:none}
+.inp:focus,.sel:focus{border-color:var(--gold);background:var(--s3)}
+.sel{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%234a6a88' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 13px center;padding-right:36px;background-color:var(--s2)}
+.sel option,.sel optgroup{background:#0d1820}
+.fg{margin-bottom:12px}
+.frow{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.frow3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.sub-btn{width:100%;padding:14px;background:linear-gradient(135deg,var(--gold),#d4880c);color:#000;border:none;border-radius:13px;font-size:16px;font-weight:800;font-family:'Outfit',sans-serif;cursor:pointer;margin-top:4px;box-shadow:0 5px 18px rgba(245,160,32,.22);transition:opacity .15s,transform .1s}
+.sub-btn:active{opacity:.85;transform:scale(.98)}
+.lerr{color:var(--red);font-size:13px;text-align:center;margin-top:8px;min-height:17px;font-weight:500}
+.ferr{color:var(--red);font-size:12px;text-align:center;margin-top:7px;min-height:16px}
+
+/* REG SCREEN */
+#reg-screen{overflow-y:auto;-webkit-overflow-scrolling:touch;align-items:center;padding:0}
+.rcard{width:100%;max-width:420px;background:var(--s1);border-radius:20px;padding:20px 17px;border:1px solid var(--bdr2);margin:12px auto 26px}
+.rttl{font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:2px;color:var(--gold);margin-bottom:14px;display:flex;align-items:center;gap:10px}
+.back-btn{cursor:pointer;font-size:22px;line-height:1;flex-shrink:0}
+.info-box{background:var(--gold-d);border:1px solid rgba(245,160,32,.22);border-radius:10px;padding:10px 12px;margin-bottom:13px;font-size:12px;color:var(--gold);line-height:1.5}
+
+/* TOPBAR */
+.topbar{display:flex;align-items:center;padding:11px 15px;background:var(--s1);border-bottom:1px solid var(--bdr);gap:10px;flex-shrink:0;min-height:52px}
+.th{font-family:'Bebas Neue',sans-serif;font-size:19px;letter-spacing:2.5px;color:var(--gold);line-height:1}
+.ts{font-size:11px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ibtn{width:37px;height:37px;border-radius:10px;background:var(--s2);border:1px solid var(--bdr);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;font-size:16px;transition:background .15s;position:relative}
+.ibtn:active{background:var(--s3)}
+.sdot{position:absolute;top:6px;right:6px;width:6px;height:6px;border-radius:50%;background:var(--muted)}
+@keyframes sdotPulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* SCROLL */
+.scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 14px;overscroll-behavior:contain}
+
+/* BOTTOM NAV */
+.bnav{display:flex;background:var(--s1);border-top:1px solid var(--bdr);padding-bottom:var(--sb);flex-shrink:0}
+.nbtn{flex:1;display:flex;flex-direction:column;align-items:center;padding:9px 4px;cursor:pointer;gap:3px;border:none;background:transparent;color:var(--muted);font-family:'Outfit',sans-serif;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;transition:color .18s}
+.nbtn.active{color:var(--gold)}
+.ni{font-size:20px;line-height:1}
+
+/* PANELS */
+.tab-panel{display:none}.tab-panel.active{display:block}
+
+/* SUMMARY */
+.srow{display:flex;gap:7px;margin-bottom:12px}
+.scard{flex:1;background:var(--s1);border:1px solid var(--bdr);border-radius:12px;padding:11px 5px;text-align:center}
+.sv{font-family:'Bebas Neue',sans-serif;font-size:20px;line-height:1;letter-spacing:.5px}
+.sl{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin-top:3px}
+
+/* LEGEND */
+.legend{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+.leg-chip{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--sub);font-weight:500}
+.leg-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+
+/* SECTION */
+.sec{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.sttl{font-family:'Bebas Neue',sans-serif;font-size:14px;letter-spacing:2px;color:var(--muted)}
+.badge{background:var(--s2);border:1px solid var(--bdr);border-radius:20px;padding:2px 9px;font-size:11px;color:var(--muted);font-weight:500}
+
+/* STUDENT CARD */
+.sc{background:var(--s1);border:1px solid var(--bdr);border-radius:15px;padding:12px 12px 12px 17px;margin-bottom:9px;display:flex;align-items:center;gap:11px;cursor:pointer;position:relative;overflow:hidden;transition:background .15s}
+.sc:active{background:var(--s2)}
+.sc.discontinued{opacity:.38;filter:grayscale(.8)}
+.sc-bar{position:absolute;left:0;top:0;bottom:0;width:4px;border-radius:2px 0 0 2px}
+.sc-av{width:42px;height:42px;border-radius:11px;background:var(--s2);display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:18px;color:var(--gold);flex-shrink:0;border:1px solid var(--bdr)}
+.sc.discontinued .sc-av{color:var(--grey)}
+.sc-info{flex:1;min-width:0}
+.sc-name{font-weight:700;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sc-meta{font-size:11px;color:var(--muted);margin-top:2px}
+.sc-pill{display:inline-block;font-size:9px;padding:2px 7px;border-radius:20px;margin-top:3px;font-weight:700}
+.pill-disc{background:rgba(120,130,140,.14);color:var(--grey);border:1px solid rgba(120,130,140,.2)}
+.pill-setup{background:var(--gold-d);color:var(--gold)}
+.pill-pend{background:var(--ora-d);color:var(--orange)}
+.sc-due{text-align:right;flex-shrink:0}
+.sc-amt{font-family:'Bebas Neue',sans-serif;font-size:20px;line-height:1}
+.sc-lbl{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-top:2px}
+
+/* MONTH GRID */
+.mgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:11px}
+.mchip{border-radius:12px;padding:10px 5px;text-align:center;border:2px solid transparent;transition:all .13s;user-select:none}
+.mchip.tappable{cursor:pointer}
+.mchip.tappable:active{transform:scale(.96)}
+.mchip.na{opacity:.18;cursor:default;background:transparent;border-color:var(--bdr)}
+.mchip.due{background:var(--red-d);border-color:rgba(240,64,96,.25)}
+.mchip.pending{background:var(--ora-d);border-color:rgba(255,140,66,.4)}
+.mchip.paid{background:var(--grn-d);border-color:rgba(45,224,144,.25)}
+.mchip.sel{border-color:var(--gold)!important;box-shadow:0 0 0 1px var(--gold)}
+.mn{font-weight:800;font-size:14px;letter-spacing:.5px;line-height:1}
+.mchip.due .mn{color:var(--red)}.mchip.pending .mn{color:var(--orange)}.mchip.paid .mn{color:var(--green)}.mchip.na .mn{color:var(--muted)}
+.ms{font-size:9px;color:var(--muted);margin-top:3px;text-transform:uppercase}
+.mm{font-size:9px;color:var(--sub);margin-top:1px}
+
+/* BOTTOM SHEET */
+.bdrop{position:fixed;inset:0;background:rgba(0,0,0,.76);z-index:60;display:none;align-items:flex-end;backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
+.bdrop.open{display:flex}
+.bsheet{width:100%;background:var(--s1);border-radius:24px 24px 0 0;max-height:93dvh;display:flex;flex-direction:column;animation:bsUp .3s cubic-bezier(.34,1.4,.64,1);padding-bottom:calc(10px + var(--sb));border-top:1px solid var(--bdr2)}
+@keyframes bsUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.bs-handle{width:36px;height:4px;background:var(--s3);border-radius:2px;margin:11px auto 0;flex-shrink:0}
+.bs-hdr{padding:10px 16px 10px;flex-shrink:0;border-bottom:1px solid var(--bdr)}
+.bs-name{font-family:'Bebas Neue',sans-serif;font-size:21px;letter-spacing:2px;color:var(--gold)}
+.bs-meta{font-size:12px;color:var(--muted);margin-top:2px}
+.bs-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 16px;overscroll-behavior:contain}
+.bs-foot{padding:8px 16px 0;flex-shrink:0;border-top:1px solid var(--bdr);display:flex;flex-direction:column;gap:7px}
+
+/* Sheet tabs */
+.stabs{display:flex;background:var(--s2);border-radius:10px;padding:3px;margin-bottom:12px;border:1px solid var(--bdr)}
+.stab{flex:1;padding:8px;text-align:center;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;color:var(--muted);transition:all .18s;border:none;background:transparent;font-family:'Outfit',sans-serif}
+.stab.active{background:var(--s3);color:var(--text);border:1px solid var(--bdr2)}
+
+/* BUTTONS */
+.btn{width:100%;padding:13px;border-radius:12px;border:none;cursor:pointer;font-family:'Outfit',sans-serif;font-size:15px;font-weight:700;transition:opacity .13s,transform .1s;text-align:center;display:block}
+.btn:active{opacity:.8;transform:scale(.98)}
+.btn-gold{background:linear-gradient(135deg,var(--gold),#d4880c);color:#000;box-shadow:0 4px 14px rgba(245,160,32,.2)}
+.btn-green{background:var(--green);color:#000}
+.btn-ora{background:var(--orange);color:#000}
+.btn-red{background:var(--red-d);color:var(--red);border:1px solid rgba(240,64,96,.3)}
+.btn-ghost{background:var(--s2);color:var(--sub);border:1px solid var(--bdr)}
+.btn-grey{background:rgba(120,130,140,.12);color:var(--grey);border:1px solid rgba(120,130,140,.2)}
+.btn-sm{padding:10px 13px;font-size:13px}
+
+/* MODE ROW */
+.mrow{display:flex;gap:7px;margin-bottom:9px}
+.mbtn{flex:1;padding:10px 4px;background:var(--s2);border:1.5px solid var(--bdr);border-radius:10px;color:var(--muted);font-size:12px;font-weight:700;font-family:'Outfit',sans-serif;cursor:pointer;text-align:center;transition:all .13s}
+.mbtn.sel{border-color:var(--gold);color:var(--gold);background:var(--gold-d)}
+
+/* SELBAR */
+.selbar{background:var(--gold-d);border:1px solid rgba(245,160,32,.22);border-radius:9px;padding:8px 12px;margin-bottom:9px;font-size:13px;color:var(--gold);font-weight:600;display:none}
+.selbar.show{display:block}
+
+/* ADD CARD */
+.add-card{background:var(--s1);border:1px solid var(--bdr);border-radius:16px;padding:15px 13px;margin-bottom:12px}
+.act{font-family:'Bebas Neue',sans-serif;font-size:15px;letter-spacing:2px;color:var(--gold);margin-bottom:12px}
+
+/* SETUP BANNER */
+.setup-banner{background:rgba(245,160,32,.08);border:1px solid rgba(245,160,32,.22);border-radius:13px;padding:13px;margin-bottom:12px}
+.sb-ttl{font-weight:700;margin-bottom:6px;font-size:13px;color:var(--gold)}
+.sb-row{display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-top:1px solid rgba(245,160,32,.12)}
+.sb-nm{font-size:13px}
+.sb-btn{background:var(--gold);color:#000;border:none;border-radius:7px;padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Outfit',sans-serif}
+
+/* PROFILE */
+.ef-row{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--bdr)}
+.ef-row:last-child{border-bottom:none}
+.ef-lbl{font-size:11px;color:var(--muted);font-weight:600;width:84px;flex-shrink:0;text-transform:uppercase;letter-spacing:.4px}
+.ef-inp{flex:1;background:var(--s3);border:1px solid var(--bdr2);border-radius:8px;padding:7px 9px;color:var(--text);font-size:14px;font-family:'Outfit',sans-serif;outline:none}
+.ef-inp:focus{border-color:var(--gold)}
+.ef-sel{flex:1;background:var(--s3);border:1px solid var(--bdr2);border-radius:8px;padding:7px 9px;color:var(--text);font-size:14px;font-family:'Outfit',sans-serif;outline:none;-webkit-appearance:none;appearance:none}
+.ef-sel:focus{border-color:var(--gold)}
+
+/* DISCONTINUED */
+.dc-toggle{font-size:12px;color:var(--muted);cursor:pointer;padding:7px 0;display:flex;align-items:center;gap:6px;font-weight:600;user-select:none}
+
+/* EMPTY */
+.empty{text-align:center;padding:44px 20px;color:var(--muted)}
+.ei{font-size:42px;margin-bottom:10px}
+.et{font-size:14px;line-height:1.6}
+
+/* TOAST */
+#toast{position:fixed;bottom:calc(64px + var(--sb));left:50%;transform:translateX(-50%) translateY(12px);background:var(--s2);color:var(--text);padding:10px 16px;border-radius:11px;font-size:14px;font-weight:600;z-index:9999;opacity:0;transition:all .24s cubic-bezier(.34,1.4,.64,1);white-space:nowrap;border:1px solid var(--bdr2);box-shadow:0 8px 22px rgba(0,0,0,.5);pointer-events:none;max-width:calc(100vw - 28px)}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+
+<!-- ════════ INTRO ════════ -->
+<div id="intro">
+  <div id="pitch"></div>
+  <div id="stumps" style="position:relative">
+    <div class="stump"></div>
+    <div class="stump" style="position:relative"><div class="bails"><div class="bail"></div><div class="bail"></div></div></div>
+    <div class="stump"></div>
+  </div>
+
+  <!-- PALE WILLOW BAT (matching photo) -->
+  <div id="bat-wrap">
+    <svg width="56" height="215" viewBox="0 0 56 215" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <!-- Black rubber grip -->
+        <linearGradient id="hg" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stop-color="#0d0d0d"/>
+          <stop offset="30%" stop-color="#2a2a2a"/>
+          <stop offset="55%" stop-color="#1e1e1e"/>
+          <stop offset="100%" stop-color="#080808"/>
+        </linearGradient>
+        <!-- Pale willow wood blade -->
+        <linearGradient id="bg" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stop-color="#c0ac90"/>
+          <stop offset="18%" stop-color="#d8c8a8"/>
+          <stop offset="38%" stop-color="#e8dcc4"/>
+          <stop offset="55%" stop-color="#e0d4b8"/>
+          <stop offset="78%" stop-color="#cdbfa0"/>
+          <stop offset="100%" stop-color="#b0a080"/>
+        </linearGradient>
+        <!-- Splice gradient -->
+        <linearGradient id="sg" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#c8a870"/>
+          <stop offset="100%" stop-color="#a88848"/>
+        </linearGradient>
+        <clipPath id="hclip"><rect x="21" y="0" width="14" height="58"/></clipPath>
+      </defs>
+
+      <!-- ── Handle / Grip (black rubber) ── -->
+      <rect x="21" y="0" width="14" height="58" rx="7" fill="url(#hg)"/>
+      <!-- Grip wrap lines (diagonal bands) -->
+      <g clip-path="url(#hclip)" stroke="#050505" stroke-width="2" opacity=".5">
+        <line x1="21" y1="5"  x2="35" y2="15"/>
+        <line x1="21" y1="12" x2="35" y2="22"/>
+        <line x1="21" y1="19" x2="35" y2="29"/>
+        <line x1="21" y1="26" x2="35" y2="36"/>
+        <line x1="21" y1="33" x2="35" y2="43"/>
+        <line x1="21" y1="40" x2="35" y2="50"/>
+        <line x1="21" y1="47" x2="35" y2="57"/>
+      </g>
+      <!-- Grip highlight -->
+      <rect x="21" y="10" width="14" height="1.8" rx=".9" fill="rgba(255,255,255,.1)"/>
+      <rect x="21" y="24" width="14" height="1.8" rx=".9" fill="rgba(255,255,255,.1)"/>
+      <rect x="21" y="38" width="14" height="1.8" rx=".9" fill="rgba(255,255,255,.1)"/>
+      <!-- End cap -->
+      <ellipse cx="28" cy="1.5" rx="7" ry="3" fill="#1a1a1a"/>
+      <ellipse cx="28" cy="1.5" rx="4.5" ry="2" fill="#2e2e2e"/>
+
+      <!-- ── White toe of grip (transition) ── -->
+      <rect x="20" y="52" width="16" height="5" rx="2.5" fill="rgba(255,255,255,.18)"/>
+
+      <!-- ── Splice (V-shoulder between grip and blade) ── -->
+      <path d="M21 55 Q11 66 9 80 L47 80 Q45 66 35 55 Z" fill="url(#sg)"/>
+      <!-- Splice grain -->
+      <line x1="20" y1="57" x2="11" y2="76" stroke="rgba(80,50,10,.2)" stroke-width="1"/>
+      <line x1="24" y1="56" x2="17" y2="78" stroke="rgba(80,50,10,.2)" stroke-width="1"/>
+      <line x1="32" y1="56" x2="39" y2="78" stroke="rgba(80,50,10,.2)" stroke-width="1"/>
+      <line x1="36" y1="57" x2="45" y2="76" stroke="rgba(80,50,10,.2)" stroke-width="1"/>
+      <!-- Shoulder highlight line (white stripe) -->
+      <rect x="17" y="53" width="22" height="2.5" rx="1.25" fill="rgba(255,255,255,.35)"/>
+
+      <!-- ── Blade (pale willow) ── -->
+      <path d="M9 78 Q5 100 4 134 Q3 170 9 190 Q17 208 28 210 Q39 208 47 190 Q53 170 52 134 Q51 100 47 78 Z"
+        fill="url(#bg)"/>
+
+      <!-- Blade center ridge (subtle) -->
+      <path d="M28 82 Q27 144 28 208" fill="none" stroke="rgba(160,120,60,.25)" stroke-width="1.5"/>
+
+      <!-- Wood grain lines (very subtle, pale willow) -->
+      <g stroke="rgba(130,90,30,.1)" stroke-width=".7" fill="none">
+        <path d="M13 86 Q28 83 43 86"/>
+        <path d="M11 100 Q28 96 45 100"/>
+        <path d="M10 116 Q28 111 46 116"/>
+        <path d="M10 133 Q28 128 46 133"/>
+        <path d="M10 150 Q28 145 46 150"/>
+        <path d="M11 167 Q28 162 45 167"/>
+        <path d="M12 183 Q28 178 44 183"/>
+      </g>
+
+      <!-- Blade left edge (rounded edge shadow) -->
+      <path d="M9 78 Q5 100 4 134 Q3 170 9 190 Q12 200 18 207"
+        fill="none" stroke="rgba(100,70,20,.3)" stroke-width="2.5" stroke-linecap="round"/>
+      <!-- Blade right edge -->
+      <path d="M47 78 Q51 100 52 134 Q53 170 47 190 Q44 200 38 207"
+        fill="none" stroke="rgba(220,190,140,.4)" stroke-width="2" stroke-linecap="round"/>
+    </svg>
+  </div>
+
+  <!-- REALISTIC CRICKET BALL (matching photo) -->
+  <div id="ball-wrap">
+    <svg id="ball-svg" width="80vmin" height="80vmin" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <!-- Rich crimson leather - brighter polished left, darker right -->
+        <radialGradient id="ballGrad" cx="32%" cy="28%" r="72%">
+          <stop offset="0%"   stop-color="#e82828"/>
+          <stop offset="28%"  stop-color="#c41010"/>
+          <stop offset="58%"  stop-color="#960808"/>
+          <stop offset="82%"  stop-color="#6e0404"/>
+          <stop offset="100%" stop-color="#4c0202"/>
+        </radialGradient>
+        <!-- Polish shine (left/polished half) -->
+        <radialGradient id="polishShine" cx="26%" cy="24%" r="48%">
+          <stop offset="0%"   stop-color="rgba(255,240,200,.42)"/>
+          <stop offset="35%"  stop-color="rgba(255,220,170,.18)"/>
+          <stop offset="70%"  stop-color="rgba(255,200,150,.05)"/>
+          <stop offset="100%" stop-color="rgba(255,200,150,0)"/>
+        </radialGradient>
+        <!-- Right half slightly darker (rough side) -->
+        <radialGradient id="roughSide" cx="75%" cy="70%" r="48%">
+          <stop offset="0%"   stop-color="rgba(0,0,0,.18)"/>
+          <stop offset="100%" stop-color="rgba(0,0,0,0)"/>
+        </radialGradient>
+        <clipPath id="ballClip"><circle cx="100" cy="100" r="94"/></clipPath>
+        <filter id="seamBlur"><feGaussianBlur stdDeviation=".5"/></filter>
+      </defs>
+
+      <!-- Ball shadow -->
+      <ellipse cx="100" cy="196" rx="64" ry="7" fill="rgba(0,0,0,.38)"/>
+
+      <!-- Ball body -->
+      <circle cx="100" cy="100" r="94" fill="url(#ballGrad)"/>
+      <!-- Polish shine overlay -->
+      <circle cx="100" cy="100" r="94" fill="url(#polishShine)"/>
+      <!-- Rough side darkening -->
+      <circle cx="100" cy="100" r="94" fill="url(#roughSide)"/>
+
+      <!-- ══ SEAM SYSTEM ══
+           Real cricket ball: 4 leather quadrants stitched together.
+           Front view shows two curved seam ridges (the equatorial seam).
+           Each ridge has prominent white zigzag stitching.
+      -->
+
+      <!-- Seam ridge backdrop (raised dark ridge) -->
+      <path d="M 18,84 C 58,58 142,104 182,120"
+        fill="none" stroke="#7a0303" stroke-width="14" stroke-linecap="round"
+        clip-path="url(#ballClip)"/>
+      <!-- Ridge base highlight (lighter red shows raised leather) -->
+      <path d="M 18,84 C 58,58 142,104 182,120"
+        fill="none" stroke="#cc0808" stroke-width="9" stroke-linecap="round"
+        clip-path="url(#ballClip)"/>
+
+      <!-- Upper seam line -->
+      <path d="M 18,80 C 58,54 142,100 182,116"
+        fill="none" stroke="#aa0606" stroke-width="3.5" stroke-linecap="round"
+        clip-path="url(#ballClip)" filter="url(#seamBlur)"/>
+      <!-- Lower seam line -->
+      <path d="M 18,90 C 58,64 142,110 182,126"
+        fill="none" stroke="#aa0606" stroke-width="3.5" stroke-linecap="round"
+        clip-path="url(#ballClip)" filter="url(#seamBlur)"/>
+
+      <!-- ══ WHITE ZIGZAG STITCHING ══
+           Two zigzag rows between the seam ridges (like real ball photo).
+           Row 1: peaks touch upper seam, valleys touch lower seam
+           Row 2: offset half-phase from row 1
+      -->
+
+      <!-- Zigzag row 1 (main stitching) -->
+      <polyline
+        points="21,80 29,93 39,77 49,92 59,74 69,90 79,73 89,89 99,75 109,91 119,79 129,96 139,85 149,101 159,93 169,109 179,101 184,114"
+        fill="none" stroke="#f2e8d0" stroke-width="2.2"
+        stroke-linecap="round" stroke-linejoin="round"
+        clip-path="url(#ballClip)"/>
+
+      <!-- Zigzag row 2 (parallel offset stitching) -->
+      <polyline
+        points="21,90 29,79 39,93 49,78 59,94 69,79 79,94 89,79 99,94 109,80 119,95 129,80 139,96 149,82 159,102 169,89 179,108 184,96"
+        fill="none" stroke="#f2e8d0" stroke-width="2.2"
+        stroke-linecap="round" stroke-linejoin="round"
+        clip-path="url(#ballClip)"/>
+
+      <!-- ══ PRIMARY SPECULAR HIGHLIGHT (polished side) ══ -->
+      <!-- Main large highlight -->
+      <ellipse cx="64" cy="54" rx="26" ry="17"
+        fill="rgba(255,245,225,.32)" transform="rotate(-28,64,54)"/>
+      <!-- Small tight hotspot -->
+      <ellipse cx="52" cy="46" rx="12" ry="8"
+        fill="rgba(255,248,230,.22)" transform="rotate(-22,52,46)"/>
+
+      <!-- DCA text -->
+      <text x="100" y="117"
+        text-anchor="middle"
+        fill="rgba(255,255,255,.92)"
+        font-family="'Arial Black',Arial,sans-serif"
+        font-size="30" font-weight="900" letter-spacing="6">DCA</text>
+    </svg>
+  </div>
+
+  <div id="tagline">COACHING FEES MANAGER</div>
+</div>
+
+<!-- ════════ LOADING ════════ -->
+<div id="loading-screen">
+  <div class="spinner"></div>
+  <div class="load-txt">CONNECTING TO CLOUD…</div>
+</div>
+
+<!-- ════════ LOGIN ════════ -->
+<div id="login-screen" class="screen">
+  <div class="lcard" style="margin:auto">
+    <div style="text-align:center;margin-bottom:20px">
+      <svg width="58" height="58" viewBox="0 0 58 58">
+        <defs><radialGradient id="lb" cx="35%" cy="28%" r="68%"><stop offset="0%" stop-color="#e82828"/><stop offset="100%" stop-color="#7a0808"/></radialGradient></defs>
+        <circle cx="29" cy="29" r="27" fill="url(#lb)"/>
+        <path d="M29 2 C43 12 43 46 29 56" fill="none" stroke="#f0e0c0" stroke-width="1.8"/>
+        <path d="M29 2 C15 12 15 46 29 56" fill="none" stroke="#f0e0c0" stroke-width="1.8"/>
+        <polyline points="18,28 24,36 18,36 24,44" fill="none" stroke="#f0e0c0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <polyline points="29,26 29,44" fill="none" stroke="#f0e0c0" stroke-width="1.5" stroke-linecap="round"/>
+        <polyline points="34,26 34,44 41,44" fill="none" stroke="#f0e0c0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <div class="bttl">FEES MANAGER</div>
+      <div class="bsub">DCA Coaching · 2026</div>
+    </div>
+
+    <div class="fg">
+      <label class="lbl">Who are you?</label>
+      <select class="sel" id="who" onchange="onWhoChange()">
+        <option value="">— Select to continue —</option>
+        <option value="admin">👑 Admin</option>
+        <optgroup label="─── Students ───" id="stu-grp"></optgroup>
+        <option value="__new__">🆕 New Student — Register</option>
+      </select>
+    </div>
+
+    <div id="a-wrap" style="display:none">
+      <div class="fg"><label class="lbl">Password</label><input class="inp" id="a-pass" type="password" placeholder="Admin password" autocomplete="current-password"></div>
+      <button class="sub-btn" onclick="loginAdmin()">Login as Admin</button>
+    </div>
+
+    <div id="s-wrap" style="display:none">
+      <div class="fg"><label class="lbl">Your PIN (4-digit)</label><input class="inp" id="s-pin" type="password" inputmode="numeric" maxlength="4" placeholder="••••"></div>
+      <button class="sub-btn" onclick="loginStudent()">Login</button>
+    </div>
+
+    <div class="lerr" id="lerr"></div>
+  </div>
+</div>
+
+<!-- ════════ REGISTER ════════ -->
+<div id="reg-screen" class="screen" style="overflow-y:auto;-webkit-overflow-scrolling:touch;align-items:center;padding:0">
+  <div class="rcard">
+    <div class="rttl">
+      <span class="back-btn" onclick="showScreen('login-screen')">←</span>
+      NEW STUDENT REGISTRATION
+    </div>
+    <div class="info-box">📌 Fill your details below. Batch &amp; fees will be assigned by your coach after review.</div>
+
+    <div class="fg"><label class="lbl">Full Name *</label><input class="inp" id="r-name" type="text" placeholder="Your full name" autocorrect="off"></div>
+    <div class="frow">
+      <div class="fg"><label class="lbl">Mobile *</label><input class="inp" id="r-mobile" type="tel" inputmode="tel" placeholder="10-digit"></div>
+      <div class="fg"><label class="lbl">WhatsApp</label><input class="inp" id="r-wa" type="tel" inputmode="tel" placeholder="If different"></div>
+    </div>
+    <div class="frow">
+      <div class="fg"><label class="lbl">Date of Birth</label><input class="inp" id="r-dob" type="date" onchange="autoAge()"></div>
+      <div class="fg"><label class="lbl">Age (auto)</label><input class="inp" id="r-age" type="number" inputmode="numeric" placeholder="Auto from DOB" min="5" max="60" readonly style="color:var(--sub)"></div>
+    </div>
+    <div class="frow">
+      <div class="fg">
+        <label class="lbl">Blood Group</label>
+        <select class="sel" id="r-blood">
+          <option value="">Select</option>
+          <option>A+</option><option>A-</option><option>B+</option><option>B-</option>
+          <option>AB+</option><option>AB-</option><option>O+</option><option>O-</option>
+        </select>
+      </div>
+      <div class="fg"><label class="lbl">Guardian Name</label><input class="inp" id="r-guardian" type="text" placeholder="Parent name" autocorrect="off"></div>
+    </div>
+    <div class="fg"><label class="lbl">Address</label><input class="inp" id="r-addr" type="text" placeholder="Area, City" autocorrect="off"></div>
+    <div class="frow">
+      <div class="fg"><label class="lbl">Emergency No.</label><input class="inp" id="r-emg" type="tel" inputmode="tel" placeholder="Guardian's no."></div>
+      <div class="fg">
+        <label class="lbl">Batch (ask coach) *</label>
+        <select class="sel" id="r-batch">
+          <option value="">Select Batch</option>
+          <optgroup label="Senior">
+            <option>Senior A</option><option>Senior B</option><option>Senior C</option>
+          </optgroup>
+          <optgroup label="Junior">
+            <option>Junior A</option><option>Junior B</option><option>Junior C</option>
+          </optgroup>
+        </select>
+      </div>
+    </div>
+    <div class="frow">
+      <div class="fg"><label class="lbl">Create PIN *</label><input class="inp" id="r-pin" type="password" inputmode="numeric" maxlength="4" placeholder="4 digits"></div>
+      <div class="fg"><label class="lbl">Confirm PIN *</label><input class="inp" id="r-pin2" type="password" inputmode="numeric" maxlength="4" placeholder="4 digits"></div>
+    </div>
+    <button class="sub-btn" onclick="registerStudent()">Register</button>
+    <div class="ferr" id="rerr"></div>
+  </div>
+</div>
+
+<!-- ════════ ADMIN ════════ -->
+<div id="admin-screen" class="screen">
+  <div class="topbar">
+    <div style="flex:1;min-width:0"><div class="th">DCA ADMIN</div><div class="ts" id="adm-date"></div></div>
+    <div class="ibtn" onclick="exportData()" title="Backup">💾<div class="sdot" id="sdot"></div></div>
+    <div class="ibtn" onclick="logout()">🚪</div>
+  </div>
+  <div class="scroll">
+    <div class="srow" id="adm-sum"></div>
+    <div id="setup-area"></div>
+    <div id="panel-stu" class="tab-panel active">
+      <div class="sec"><span class="sttl">STUDENTS — HIGHEST DUE FIRST</span><span class="badge" id="stu-cnt">0</span></div>
+      <div id="stu-list"></div>
+      <div id="discont-section"></div>
+    </div>
+    <div id="panel-cfg" class="tab-panel">
+      <div class="add-card">
+        <div class="act">☁️ FIREBASE SYNC</div>
+        <div id="fb-txt" style="font-size:13px;color:var(--sub);line-height:1.6;margin-bottom:11px"></div>
+        <button class="btn btn-ghost btn-sm" onclick="forceSyncNow()">🔄 Sync Now</button>
+      </div>
+      <div class="add-card">
+        <div class="act">📋 BACKUP / RESTORE</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.5">Download &amp; save to Google Drive as extra backup. Restore when switching phones.</div>
+        <button class="btn btn-ghost btn-sm" onclick="exportData()">📥 Download Backup</button>
+        <div style="height:7px"></div>
+        <input type="file" id="import-file" accept=".json" onchange="importData(event)" style="display:none">
+        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('import-file').click()">📂 Restore from Backup</button>
+      </div>
+      <div class="add-card">
+        <div class="act">🔐 CHANGE PASSWORD</div>
+        <div class="fg"><label class="lbl">New Password</label><input class="inp" id="n-pass" type="password" placeholder="Min 4 characters"></div>
+        <button class="btn btn-ghost btn-sm" onclick="changePassword()">Update</button>
+      </div>
+    </div>
+  </div>
+  <nav class="bnav">
+    <button class="nbtn active" id="nav-stu" onclick="adminNav('stu')"><span class="ni">👥</span>Students</button>
+    <button class="nbtn" id="nav-cfg" onclick="adminNav('cfg')"><span class="ni">⚙️</span>Settings</button>
+  </nav>
+</div>
+
+<!-- ════════ STUDENT SCREEN ════════ -->
+<div id="student-screen" class="screen">
+  <div class="topbar">
+    <div style="flex:1;min-width:0"><div class="th" id="stu-nm"></div><div class="ts" id="stu-bt"></div></div>
+    <div class="ibtn" onclick="logout()">🚪</div>
+  </div>
+  <div class="scroll">
+    <div class="srow" id="stu-sum"></div>
+    <!-- Legend: explain due vs pending vs paid -->
+    <div class="legend">
+      <div class="leg-chip"><div class="leg-dot" style="background:var(--red)"></div>Due — not paid</div>
+      <div class="leg-chip"><div class="leg-dot" style="background:var(--orange)"></div>Pending — awaiting coach confirm</div>
+      <div class="leg-chip"><div class="leg-dot" style="background:var(--green)"></div>Paid — confirmed</div>
+    </div>
+    <div class="sec"><span class="sttl">2026 FEES</span></div>
+    <div class="selbar" id="stu-selbar"></div>
+    <div class="mgrid" id="stu-grid"></div>
+    <div id="stu-action"></div>
+    <div style="height:20px"></div>
+  </div>
+</div>
+
+<!-- ════════ ADMIN DETAIL SHEET ════════ -->
+<div class="bdrop" id="det-back" onclick="closeSheet(event)">
+  <div class="bsheet">
+    <div class="bs-handle"></div>
+    <div class="bs-hdr"><div class="bs-name" id="d-nm"></div><div class="bs-meta" id="d-mt"></div></div>
+    <div class="bs-body">
+      <div class="stabs">
+        <button class="stab active" id="dtab-fees"    onclick="switchDTab('fees')">💰 Fees</button>
+        <button class="stab"        id="dtab-profile" onclick="switchDTab('profile')">👤 Profile</button>
+        <button class="stab"        id="dtab-setup"   onclick="switchDTab('setup')">⚙️ Setup</button>
+      </div>
+
+      <!-- FEES TAB -->
+      <div id="dpanel-fees">
+        <div class="srow" id="d-sum"></div>
+        <div class="selbar" id="d-selbar"></div>
+        <div class="mgrid" id="d-grid"></div>
+        <div id="d-fees-note" style="font-size:11px;color:var(--muted);text-align:center;padding:6px 0;display:none">
+          Complete student setup first to see fees.
+        </div>
+      </div>
+
+      <!-- PROFILE TAB -->
+      <div id="dpanel-profile" style="display:none">
+        <div style="font-size:11px;color:var(--gold);margin-bottom:10px;font-weight:600">Tap any field to edit &amp; save.</div>
+        <div id="prof-fields"></div>
+        <button class="btn btn-ghost btn-sm" style="margin-top:10px" onclick="saveProfile()">💾 Save Profile</button>
+        <div class="ferr" id="prof-err"></div>
+      </div>
+
+      <!-- SETUP TAB -->
+      <div id="dpanel-setup" style="display:none">
+        <div style="font-size:11px;color:var(--gold);margin-bottom:13px;font-weight:600">Assign batch, monthly fee and when fees start from.</div>
+        <div class="fg">
+          <label class="lbl">Batch</label>
+          <select class="sel" id="d-batch">
+            <option value="">Select Batch</option>
+            <optgroup label="Senior"><option>Senior A</option><option>Senior B</option><option>Senior C</option></optgroup>
+            <optgroup label="Junior"><option>Junior A</option><option>Junior B</option><option>Junior C</option></optgroup>
+          </select>
+        </div>
+        <div class="frow">
+          <div class="fg"><label class="lbl">Monthly Fee ₹</label><input class="inp" id="d-fee" type="number" inputmode="numeric" placeholder="e.g. 1500"></div>
+          <div class="fg"><label class="lbl">Fees Start Month</label>
+            <select class="sel" id="d-smo">
+              <option value="0">January</option><option value="1">February</option><option value="2">March</option>
+              <option value="3">April</option><option value="4">May</option><option value="5">June</option>
+              <option value="6">July</option><option value="7">August</option><option value="8">September</option>
+              <option value="9">October</option><option value="10">November</option><option value="11">December</option>
+            </select>
+          </div>
+        </div>
+        <button class="btn btn-gold" onclick="saveSetup()">Save Setup</button>
+        <div class="ferr" id="setup-err"></div>
+        <div style="margin-top:14px;border-top:1px solid var(--bdr);padding-top:13px">
+          <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:9px">Student Status</div>
+          <button class="btn btn-grey btn-sm" id="discont-btn" onclick="toggleDiscont()">🚫 Mark as Discontinued</button>
+          <div style="font-size:11px;color:var(--muted);margin-top:6px;line-height:1.4">Discontinued students move to a separate section. All records preserved.</div>
+        </div>
+        <div style="margin-top:13px;border-top:1px solid var(--bdr);padding-top:12px">
+          <button class="btn btn-red btn-sm" onclick="deleteStudent()">🗑️ Delete Student Permanently</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="bs-foot" id="d-foot">
+      <div class="mrow" id="d-modes">
+        <button class="mbtn sel" onclick="pickMode('Cash')">💵 Cash</button>
+        <button class="mbtn" onclick="pickMode('UPI')">📱 UPI</button>
+        <button class="mbtn" onclick="pickMode('Bank')">🏦 Bank</button>
+      </div>
+      <button class="btn btn-green" onclick="adminConfirm()">✅ Confirm Received → Green</button>
+      <button class="btn btn-red"   onclick="adminUnpaid()">🔴 Mark as Unpaid / Due</button>
+      <button class="btn btn-ghost" onclick="closeSheet()">Close</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<!-- ════════════════════════════════════════
+     FIREBASE CONFIG — PASTE YOUR VALUES
+════════════════════════════════════════ -->
+<script>
+'use strict';
+
+// ── PASTE YOUR FIREBASE CONFIG HERE ──────
+const FIREBASE_CONFIG = {
+  apiKey:            "AIzaSyB8xlPUW_Yvu7g-5ysBicJH2uzg16vsCb4",
+  authDomain:        "dca-2026-576cc.firebaseapp.com",
+  projectId:         "dca-2026-576cc",
+  storageBucket:     "dca-2026-576cc.firebasestorage.app",
+  messagingSenderId: "486243412770",
+  appId:             "1:486243412770:web:0dc368abdf8f673f5f937b"
+};
+// ─────────────────────────────────────────
+
+const FB_ON = FIREBASE_CONFIG.apiKey !== "PASTE_API_KEY_HERE";
+let db = null, syncState = 'local';
+
+if (FB_ON) {
+  try {
+    firebase.initializeApp(FIREBASE_CONFIG);
+    db = firebase.firestore();
+    db.enablePersistence({ synchronizeTabs: false }).catch(() => {});
+  } catch(e) { console.warn('FB init:', e); }
+}
+
+// ── CONSTANTS ────────────────────────────
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const BATCHES = ['Senior A','Senior B','Senior C','Junior A','Junior B','Junior C'];
+
+// Current date (for month logic)
+const NOW     = new Date();
+const CUR_MO  = NOW.getMonth(); // 0-based → April = 3
+
+// ── DATA LAYER ────────────────────────────
+function getLocal() {
+  try {
+    const r = localStorage.getItem('dca_v4');
+    if (r) return JSON.parse(r);
+    return _initData();
+  } catch(e) { return _initData(); }
+}
+
+function _initData() {
+  // Pre-populate 3 test students for admin to practice with
+  const d = {
+    admin: { password: 'dca123' },
+    students: [
+      {
+        id: 'test001',
+        name: 'Rahul Kumar',
+        mobile: '9830012345',
+        whatsapp: '9830012345',
+        dob: '2010-06-15',
+        age: '15',
+        bloodGroup: 'B+',
+        guardian: 'Suresh Kumar',
+        address: 'Salt Lake, Kolkata',
+        emergencyContact: '9830012346',
+        batch: 'Senior A',
+        pin: '1111',
+        monthlyFee: 1500,
+        status: 'active',
+        months: {
+          Jan:{ status:'paid',    mode:'Cash', paidDate:'02 Jan 2026', confirmedDate:'02 Jan 2026' },
+          Feb:{ status:'paid',    mode:'UPI',  paidDate:'03 Feb 2026', confirmedDate:'04 Feb 2026' },
+          Mar:{ status:'paid',    mode:'Cash', paidDate:'01 Mar 2026', confirmedDate:'02 Mar 2026' },
+          Apr:{ status:'due',     mode:null,   paidDate:null,          confirmedDate:null },
+          May:{ status:'na',      mode:null,   paidDate:null,          confirmedDate:null },
+          Jun:{ status:'na',      mode:null,   paidDate:null,          confirmedDate:null },
+          Jul:{ status:'na',      mode:null,   paidDate:null,          confirmedDate:null },
+          Aug:{ status:'na',      mode:null,   paidDate:null,          confirmedDate:null },
+          Sep:{ status:'na',      mode:null,   paidDate:null,          confirmedDate:null },
+          Oct:{ status:'na',      mode:null,   paidDate:null,          confirmedDate:null },
+          Nov:{ status:'na',      mode:null,   paidDate:null,          confirmedDate:null },
+          Dec:{ status:'na',      mode:null,   paidDate:null,          confirmedDate:null }
+        }
+      },
+      {
+        id: 'test002',
+        name: 'Amit Patel',
+        mobile: '9820099887',
+        whatsapp: '9820099887',
+        dob: '2012-03-22',
+        age: '13',
+        bloodGroup: 'O+',
+        guardian: 'Rajesh Patel',
+        address: 'Behala, Kolkata',
+        emergencyContact: '9820099888',
+        batch: 'Junior B',
+        pin: '2222',
+        monthlyFee: 1200,
+        status: 'active',
+        months: {
+          // All 4 months unpaid — highest due (₹4800)
+          Jan:{ status:'due', mode:null, paidDate:null, confirmedDate:null },
+          Feb:{ status:'due', mode:null, paidDate:null, confirmedDate:null },
+          Mar:{ status:'due', mode:null, paidDate:null, confirmedDate:null },
+          Apr:{ status:'due', mode:null, paidDate:null, confirmedDate:null },
+          May:{ status:'na',  mode:null, paidDate:null, confirmedDate:null },
+          Jun:{ status:'na',  mode:null, paidDate:null, confirmedDate:null },
+          Jul:{ status:'na',  mode:null, paidDate:null, confirmedDate:null },
+          Aug:{ status:'na',  mode:null, paidDate:null, confirmedDate:null },
+          Sep:{ status:'na',  mode:null, paidDate:null, confirmedDate:null },
+          Oct:{ status:'na',  mode:null, paidDate:null, confirmedDate:null },
+          Nov:{ status:'na',  mode:null, paidDate:null, confirmedDate:null },
+          Dec:{ status:'na',  mode:null, paidDate:null, confirmedDate:null }
+        }
+      },
+      {
+        id: 'test003',
+        name: 'Priya Singh',
+        mobile: '9810055566',
+        whatsapp: '9810055566',
+        dob: '2009-11-08',
+        age: '16',
+        bloodGroup: 'A+',
+        guardian: 'Vikram Singh',
+        address: 'Jadavpur, Kolkata',
+        emergencyContact: '9810055567',
+        batch: 'Senior B',
+        pin: '3333',
+        monthlyFee: 1500,
+        status: 'active',
+        months: {
+          // Jan paid, Feb pending (student marked, not confirmed), Mar & Apr due
+          Jan:{ status:'paid',    mode:'Bank', paidDate:'05 Jan 2026', confirmedDate:'06 Jan 2026' },
+          Feb:{ status:'pending', mode:'UPI',  paidDate:'04 Feb 2026', confirmedDate:null },
+          Mar:{ status:'due',     mode:null,   paidDate:null,          confirmedDate:null },
+          Apr:{ status:'due',     mode:null,   paidDate:null,          confirmedDate:null },
+          May:{ status:'na',      mode:null,   paidDate:null,          confirmedDate:null },
+          Jun:{ status:'na',      mode:null,   paidDate:null,          confirmedDate:null },
+          Jul:{ status:'na',      mode:null,   paidDate:null,          confirmedDate:null },
+          Aug:{ status:'na',      mode:null,   paidDate:null,          confirmedDate:null },
+          Sep:{ status:'na',      mode:null,   paidDate:null,          confirmedDate:null },
+          Oct:{ status:'na',      mode:null,   paidDate:null,          confirmedDate:null },
+          Nov:{ status:'na',      mode:null,   paidDate:null,          confirmedDate:null },
+          Dec:{ status:'na',      mode:null,   paidDate:null,          confirmedDate:null }
+        }
+      }
+    ]
+  };
+  localStorage.setItem('dca_v4', JSON.stringify(d));
+  return d;
+}
+
+// Save → localStorage immediately + Firebase async
+function saveData(d) {
+  localStorage.setItem('dca_v4', JSON.stringify(d));
+  _fbSave(d);
+}
+
+function _fbSave(d) {
+  if (!FB_ON || !db) return;
+  _setSyncState('saving');
+  db.collection('dca').doc('appdata').set(d)
+    .then(() => _setSyncState('synced'))
+    .catch(e => { console.warn('FB save:', e); _setSyncState('error'); });
+}
+
+async function _fbLoad() {
+  if (!FB_ON || !db) return null;
+  try {
+    const doc = await db.collection('dca').doc('appdata').get();
+    if (doc.exists) { _setSyncState('synced'); return doc.data(); }
+    return null;
+  } catch(e) { _setSyncState('error'); return null; }
+}
+
+function _setSyncState(s) {
+  syncState = s;
+  const dot = document.getElementById('sdot');
+  if (!dot) return;
+  const c = { synced:'var(--green)', saving:'var(--gold)', error:'var(--red)', local:'var(--muted)' };
+  dot.style.background = c[s] || c.local;
+  dot.style.animation = s === 'saving' ? 'sdotPulse 1s ease infinite' : 'none';
+}
+
+async function forceSyncNow() {
+  if (!FB_ON) { toast('Configure Firebase first'); updateFBTxt(); return; }
+  _setSyncState('saving');
+  try {
+    await db.collection('dca').doc('appdata').set(getLocal());
+    _setSyncState('synced'); toast('✅ Synced to cloud');
+  } catch(e) { _setSyncState('error'); toast('❌ Sync failed — check internet'); }
+  updateFBTxt();
+}
+
+function updateFBTxt() {
+  const el = document.getElementById('fb-txt');
+  if (!el) return;
+  if (!FB_ON) {
+    el.innerHTML = '⚠️ <b>Firebase not configured yet.</b><br>Data is stored on this device only.<br><br>Open the HTML file in a text editor → find <b>FIREBASE_CONFIG</b> near the top → paste your project values.';
+    return;
+  }
+  const t = { synced:'🟢 Connected — all changes sync automatically', saving:'🟡 Saving to cloud…', error:'🔴 Sync error — check internet', local:'⚪ Local only' };
+  el.innerHTML = t[syncState] || '⚪';
+}
+
+// ── MONTH LOGIC ────────────────────────────
+// Makes months for 2026 based on start month and current date
+function makeMonths(startMoIdx) {
+  const obj = {};
+  MONTHS.forEach((m, mi) => {
+    const afterStart = mi >= startMoIdx;
+    const notFuture  = mi <= CUR_MO;       // future months = inactive
+    obj[m] = {
+      status: (afterStart && notFuture) ? 'due' : 'na',
+      mode: null, paidDate: null, confirmedDate: null
+    };
+  });
+  return obj;
+}
+
+// ── UTILS ──────────────────────────────────
+function uid()   { return Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
+function today() { return new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}); }
+
+function autoAge() {
+  const dob = document.getElementById('r-dob').value;
+  if (!dob) return;
+  const age = Math.floor((new Date() - new Date(dob)) / (365.25 * 24 * 60 * 60 * 1000));
+  document.getElementById('r-age').value = age > 0 ? age : '';
+}
+
+// ── BOOT ────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  const dEl = document.getElementById('adm-date');
+  if (dEl) dEl.textContent = new Date().toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+
+  setTimeout(() => {
+    document.getElementById('intro').classList.add('intro-out');
+    setTimeout(async () => {
+      document.getElementById('intro').style.display = 'none';
+      if (FB_ON) {
+        document.getElementById('loading-screen').classList.add('show');
+        const remote = await _fbLoad();
+        if (remote) localStorage.setItem('dca_v4', JSON.stringify(remote));
+        document.getElementById('loading-screen').classList.remove('show');
+      }
+      showScreen('login-screen');
+      fillWhoDropdown();
+    }, 480);
+  }, 4900);
+});
+
+// ── NAVIGATION ──────────────────────────────
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  const el = document.getElementById(id);
+  if (el) el.classList.add('active');
+}
+
+function adminNav(tab) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('panel-' + tab).classList.add('active');
+  document.querySelectorAll('.nbtn').forEach(b => b.classList.remove('active'));
+  document.getElementById('nav-' + tab).classList.add('active');
+  if (tab === 'stu') renderAdminStudents();
+  if (tab === 'cfg') updateFBTxt();
+}
+
+// ── LOGIN ────────────────────────────────────
+function fillWhoDropdown() {
+  const d = getLocal();
+  const grp = document.getElementById('stu-grp');
+  grp.innerHTML = '';
+  d.students.filter(s => s.status !== 'discontinued').forEach(s => {
+    const o = document.createElement('option');
+    o.value = s.id;
+    o.textContent = s.name + (s.batch ? ' (' + s.batch + ')' : ' — Awaiting setup');
+    grp.appendChild(o);
+  });
+}
+
+function onWhoChange() {
+  const v = document.getElementById('who').value;
+  document.getElementById('a-wrap').style.display = 'none';
+  document.getElementById('s-wrap').style.display = 'none';
+  document.getElementById('lerr').textContent = '';
+  if (v === 'admin') {
+    document.getElementById('a-wrap').style.display = 'block';
+    setTimeout(() => document.getElementById('a-pass').focus(), 80);
+  } else if (v === '__new__') {
+    showScreen('reg-screen');
+    document.getElementById('who').value = '';
+  } else if (v) {
+    document.getElementById('s-wrap').style.display = 'block';
+    setTimeout(() => document.getElementById('s-pin').focus(), 80);
+  }
+}
+
+let curStuId = null;
+
+function loginAdmin() {
+  const d = getLocal(), p = document.getElementById('a-pass').value;
+  if (p === d.admin.password) {
+    document.getElementById('lerr').textContent = '';
+    document.getElementById('a-pass').value = '';
+    document.getElementById('who').value = '';
+    document.getElementById('a-wrap').style.display = 'none';
+    renderAdminDashboard();
+    showScreen('admin-screen');
+  } else {
+    document.getElementById('lerr').textContent = '❌ Wrong password';
+  }
+}
+
+function loginStudent() {
+  const id  = document.getElementById('who').value;
+  const pin = document.getElementById('s-pin').value;
+  const d   = getLocal();
+  const s   = d.students.find(x => x.id === id);
+  if (!s)       { document.getElementById('lerr').textContent = 'Student not found'; return; }
+  if (s.pin !== pin) { document.getElementById('lerr').textContent = '❌ Incorrect PIN'; return; }
+  curStuId = id;
+  document.getElementById('s-pin').value = '';
+  document.getElementById('who').value = '';
+  document.getElementById('s-wrap').style.display = 'none';
+  renderStudentScreen(id);
+  showScreen('student-screen');
+}
+
+function logout() {
+  curStuId = null;
+  document.getElementById('lerr').textContent = '';
+  showScreen('login-screen');
+  fillWhoDropdown();
+}
+
+function changePassword() {
+  const np = document.getElementById('n-pass').value;
+  if (!np || np.length < 4) { toast('Min 4 characters'); return; }
+  const d = getLocal();
+  d.admin.password = np;
+  saveData(d);
+  document.getElementById('n-pass').value = '';
+  toast('✅ Password updated');
+}
+
+// ── REGISTER ─────────────────────────────────
+function registerStudent() {
+  const name     = document.getElementById('r-name').value.trim();
+  const mobile   = document.getElementById('r-mobile').value.trim();
+  const wa       = document.getElementById('r-wa').value.trim();
+  const dob      = document.getElementById('r-dob').value;
+  const age      = document.getElementById('r-age').value;
+  const blood    = document.getElementById('r-blood').value;
+  const guardian = document.getElementById('r-guardian').value.trim();
+  const addr     = document.getElementById('r-addr').value.trim();
+  const emg      = document.getElementById('r-emg').value.trim();
+  const batch    = document.getElementById('r-batch').value;
+  const pin      = document.getElementById('r-pin').value;
+  const pin2     = document.getElementById('r-pin2').value;
+  const err      = document.getElementById('rerr');
+
+  if (!name)                 { err.textContent = 'Full name required'; return; }
+  if (!/^\d{10}$/.test(mobile)) { err.textContent = 'Valid 10-digit mobile number required'; return; }
+  if (!batch)                { err.textContent = 'Select your batch (ask your coach)'; return; }
+  if (!/^\d{4}$/.test(pin)) { err.textContent = 'PIN must be exactly 4 digits'; return; }
+  if (pin !== pin2)          { err.textContent = 'PINs do not match'; return; }
+
+  const d = getLocal();
+  if (d.students.find(s => s.name.toLowerCase() === name.toLowerCase())) {
+    err.textContent = 'A student with this name already exists'; return;
+  }
+
+  d.students.push({
+    id: uid(), name, mobile, whatsapp: wa || mobile, dob, age, bloodGroup: blood,
+    guardian, address: addr, emergencyContact: emg, batch, pin,
+    monthlyFee: 0, status: 'pending_setup', months: {}
+  });
+  saveData(d); // ← auto-saves to Firebase
+
+  ['r-name','r-mobile','r-wa','r-dob','r-age','r-guardian','r-addr','r-emg','r-pin','r-pin2']
+    .forEach(id => document.getElementById(id).value = '');
+  document.getElementById('r-blood').value = '';
+  document.getElementById('r-batch').value = '';
+  err.textContent = '';
+
+  showScreen('login-screen');
+  fillWhoDropdown();
+  toast('✅ Registered! Coach will set up your fees.');
+}
+
+// ── CALCULATIONS ─────────────────────────────
+function calcDue(s)  { return MONTHS.filter(m => s.months[m] && s.months[m].status === 'due').length     * (s.monthlyFee || 0); }
+function calcPend(s) { return MONTHS.filter(m => s.months[m] && s.months[m].status === 'pending').length * (s.monthlyFee || 0); }
+function calcPaid(s) { return MONTHS.filter(m => s.months[m] && s.months[m].status === 'paid').length    * (s.monthlyFee || 0); }
+function fmt(n) {
+  if (n >= 100000) return (n / 100000).toFixed(1) + 'L';
+  if (n >= 1000)   return (n / 1000).toFixed(n % 1000 === 0 ? 0 : 1) + 'K';
+  return '' + n;
+}
+
+// ── ADMIN DASHBOARD ──────────────────────────
+function renderAdminDashboard() { renderAdminSummary(); renderAdminStudents(); renderSetupBanner(); }
+
+function renderAdminSummary() {
+  const d = getLocal(); let due = 0, pend = 0, paid = 0;
+  d.students.filter(s => s.status !== 'discontinued').forEach(s => { due += calcDue(s); pend += calcPend(s); paid += calcPaid(s); });
+  document.getElementById('adm-sum').innerHTML = `
+    <div class="scard"><div class="sv" style="color:var(--red)">₹${fmt(due)}</div><div class="sl">Total Due</div></div>
+    <div class="scard"><div class="sv" style="color:var(--orange)">₹${fmt(pend)}</div><div class="sl">Pending</div></div>
+    <div class="scard"><div class="sv" style="color:var(--green)">₹${fmt(paid)}</div><div class="sl">Collected</div></div>
+  `;
+}
+
+function renderSetupBanner() {
+  const d = getLocal();
+  const ps = d.students.filter(s => s.status === 'pending_setup');
+  const el = document.getElementById('setup-area');
+  if (!ps.length) { el.innerHTML = ''; return; }
+  el.innerHTML = `<div class="setup-banner">
+    <div class="sb-ttl">⚠️ ${ps.length} student${ps.length > 1 ? 's' : ''} need fee setup</div>
+    ${ps.map(s => `<div class="sb-row"><span class="sb-nm">${s.name} · ${s.batch}</span><button class="sb-btn" onclick="openSheet('${s.id}','setup')">Setup</button></div>`).join('')}
+  </div>`;
+}
+
+function renderAdminStudents() {
+  const d = getLocal();
+  const active   = d.students.filter(s => s.status === 'active');
+  const discont  = d.students.filter(s => s.status === 'discontinued');
+  renderAdminSummary(); renderSetupBanner();
+  document.getElementById('stu-cnt').textContent = active.length + ' student' + (active.length !== 1 ? 's' : '');
+
+  const el = document.getElementById('stu-list');
+  if (!active.length) {
+    el.innerHTML = `<div class="empty"><div class="ei">📋</div><div class="et">No active students.<br>Register a student to get started.</div></div>`;
+  } else {
+    el.innerHTML = [...active].sort((a, b) => calcDue(b) - calcDue(a)).map(s => {
+      const due   = calcDue(s);
+      const pend  = MONTHS.filter(m => s.months[m] && s.months[m].status === 'pending').length;
+      const dueN  = MONTHS.filter(m => s.months[m] && s.months[m].status === 'due').length;
+      const init  = s.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+      const bc    = due > 0 ? 'var(--red)' : pend > 0 ? 'var(--orange)' : 'var(--green)';
+      const ac    = due > 0 ? 'var(--red)' : pend > 0 ? 'var(--orange)' : 'var(--green)';
+      return `<div class="sc" onclick="openSheet('${s.id}')">
+        <div class="sc-bar" style="background:${bc}"></div>
+        <div class="sc-av">${init}</div>
+        <div class="sc-info">
+          <div class="sc-name">${s.name}</div>
+          <div class="sc-meta">📚 ${s.batch} · ₹${s.monthlyFee}/mo · 📞 ${s.mobile}${s.bloodGroup ? ' · 🩸 ' + s.bloodGroup : ''}</div>
+          ${pend > 0 ? `<span class="sc-pill pill-pend">⏳ ${pend} month${pend > 1 ? 's' : ''} pending confirm</span>` : ''}
+        </div>
+        <div class="sc-due">
+          <div class="sc-amt" style="color:${ac}">₹${fmt(due)}</div>
+          <div class="sc-lbl">${due > 0 ? dueN + ' mo due' : pend > 0 ? 'pending' : '✓ clear'}</div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  // Discontinued section
+  const ds = document.getElementById('discont-section');
+  if (!discont.length) { ds.innerHTML = ''; return; }
+  ds.innerHTML = `
+    <div class="dc-toggle" onclick="toggleDCList(this)">
+      <span>⬦</span><span>DISCONTINUED (${discont.length})</span><span id="dcc">▼</span>
+    </div>
+    <div id="dc-list" style="display:none">
+      ${discont.map(s => `
+        <div class="sc discontinued" onclick="openSheet('${s.id}','setup')">
+          <div class="sc-bar" style="background:var(--grey)"></div>
+          <div class="sc-av">${s.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()}</div>
+          <div class="sc-info">
+            <div class="sc-name">${s.name}</div>
+            <div class="sc-meta">📚 ${s.batch || '—'} · 📞 ${s.mobile || '—'}</div>
+            <span class="sc-pill pill-disc">DISCONTINUED</span>
+          </div>
+          <div class="sc-due"><div class="sc-amt" style="color:var(--grey)">₹${fmt(calcDue(s))}</div><div class="sc-lbl">balance</div></div>
+        </div>`).join('')}
+    </div>`;
+}
+
+function toggleDCList(el) {
+  const l = document.getElementById('dc-list'), c = document.getElementById('dcc');
+  l.style.display = l.style.display === 'none' ? 'block' : 'none';
+  c.textContent = l.style.display === 'none' ? '▼' : '▲';
+}
+
+// ── ADMIN SHEET ───────────────────────────────
+let dStu = null, dSel = new Set(), dMode = 'Cash';
+
+function openSheet(id, tab) {
+  dStu = id; dSel = new Set(); dMode = 'Cash';
+  refreshModeUI(); renderSheet();
+  // If pending setup → force to setup tab
+  const d = getLocal(), s = d.students.find(x => x.id === id);
+  switchDTab(tab || (s && s.status === 'pending_setup' ? 'setup' : 'fees'));
+  document.getElementById('det-back').classList.add('open');
+}
+
+function closeSheet(e) {
+  if (e && e.target !== document.getElementById('det-back')) return;
+  document.getElementById('det-back').classList.remove('open');
+  dStu = null; dSel = new Set();
+}
+
+function switchDTab(tab) {
+  ['fees', 'profile', 'setup'].forEach(t => {
+    document.getElementById('dtab-'   + t).classList.toggle('active', t === tab);
+    document.getElementById('dpanel-' + t).style.display = t === tab ? 'block' : 'none';
+  });
+  document.getElementById('d-foot').style.display = tab === 'fees' ? 'flex' : 'none';
+}
+
+function renderSheet() {
+  const d = getLocal(), s = d.students.find(x => x.id === dStu);
+  if (!s) return;
+
+  document.getElementById('d-nm').textContent = s.name;
+  document.getElementById('d-mt').textContent = (s.batch || 'No batch') + ' · ₹' + (s.monthlyFee || '—') + '/mo · 📞 ' + (s.mobile || '—');
+
+  _renderDSum(s);
+  renderDGrid(s);
+  renderProfFields(s);
+
+  // Setup tab pre-fill
+  document.getElementById('d-batch').value = s.batch  || '';
+  document.getElementById('d-fee').value   = s.monthlyFee || '';
+
+  // Discontinued button label
+  const db = document.getElementById('discont-btn');
+  if (db) db.textContent = s.status === 'discontinued' ? '✅ Reinstate Student' : '🚫 Mark as Discontinued';
+}
+
+function _renderDSum(s) {
+  document.getElementById('d-sum').innerHTML = `
+    <div class="scard"><div class="sv" style="color:var(--red)">₹${fmt(calcDue(s))}</div><div class="sl">Due</div></div>
+    <div class="scard"><div class="sv" style="color:var(--orange)">₹${fmt(calcPend(s))}</div><div class="sl">Pending</div></div>
+    <div class="scard"><div class="sv" style="color:var(--green)">₹${fmt(calcPaid(s))}</div><div class="sl">Paid</div></div>
+  `;
+}
+
+function renderDGrid(s) {
+  const note = document.getElementById('d-fees-note');
+  if (s.status === 'pending_setup' || !Object.keys(s.months).length) {
+    document.getElementById('d-grid').innerHTML = '';
+    if (note) note.style.display = 'block';
+    return;
+  }
+  if (note) note.style.display = 'none';
+
+  document.getElementById('d-grid').innerHTML = MONTHS.map(m => {
+    const ms = s.months[m] || { status: 'na' };
+    if (ms.status === 'na') return `<div class="mchip na"><div class="mn">${m}</div><div class="ms">Future</div></div>`;
+    const sel = dSel.has(m) ? ' sel' : '';
+    const lbl = ms.status === 'due' ? 'Due' : ms.status === 'pending' ? '⏳ Pend' : '✅ Paid';
+    return `<div class="mchip tappable ${ms.status}${sel}" onclick="toggleDChip('${m}')">
+      <div class="mn">${m}</div><div class="ms">${lbl}</div>
+      ${ms.mode ? `<div class="mm">${ms.mode}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function toggleDChip(m) {
+  const d = getLocal(), s = d.students.find(x => x.id === dStu);
+  if (!s) return;
+  const ms = s.months[m] || { status: 'na' };
+  if (ms.status === 'na') return;
+  dSel.has(m) ? dSel.delete(m) : dSel.add(m);
+  renderDGrid(s); updateDSelbar();
+}
+
+function updateDSelbar() {
+  const bar = document.getElementById('d-selbar'), n = dSel.size;
+  n > 0 ? (bar.classList.add('show'), bar.textContent = n + ' month' + (n > 1 ? 's' : '') + ' selected') : bar.classList.remove('show');
+}
+
+function pickMode(m) { dMode = m; refreshModeUI(); }
+function refreshModeUI() {
+  const btns = document.querySelectorAll('#d-modes .mbtn'), modes = ['Cash', 'UPI', 'Bank'];
+  btns.forEach((b, i) => b.classList.toggle('sel', modes[i] === dMode));
+}
+function reqSel() { if (!dSel.size) { toast('Select months first'); return false; } return true; }
+
+function adminConfirm() {
+  if (!reqSel()) return;
+  const d = getLocal(), s = d.students.find(x => x.id === dStu);
+  const months = [...dSel];
+  months.forEach(m => {
+    const cur = s.months[m] || {};
+    s.months[m] = { status: 'paid', mode: cur.mode || dMode, paidDate: cur.paidDate || today(), confirmedDate: today() };
+  });
+  saveData(d); dSel = new Set(); // ← auto-saves to Firebase
+  renderSheet(); renderAdminStudents();
+  triggerSMS(s, months, 'confirmed');
+  toast('✅ Confirmed received — opening SMS');
+}
+
+function adminUnpaid() {
+  if (!reqSel()) return;
+  const d = getLocal(), s = d.students.find(x => x.id === dStu);
+  const months = [...dSel];
+  months.forEach(m => { s.months[m] = { status: 'due', mode: null, paidDate: null, confirmedDate: null }; });
+  saveData(d); dSel = new Set(); // ← auto-saves to Firebase
+  renderSheet(); renderAdminStudents();
+  triggerSMS(s, months, 'reverted');
+  toast('🔴 Marked unpaid — opening SMS');
+}
+
+// ── SMS TRIGGER ───────────────────────────────
+function triggerSMS(student, months, type) {
+  if (!student.mobile || !months.length) return;
+  const mo  = months.join(', ');
+  const amt = (months.length * (student.monthlyFee || 0)).toLocaleString('en-IN');
+  let msg   = '';
+  if (type === 'confirmed')
+    msg = `DCA Coaching: Dear ${student.name}, fee for ${mo} 2026 (Rs.${amt}) CONFIRMED received via ${dMode}. Thank you! — Coach`;
+  else
+    msg = `DCA Coaching: Dear ${student.name}, fee for ${mo} 2026 marked UNPAID. Please contact your coach.`;
+  window.location.href = `sms:${student.mobile}?body=${encodeURIComponent(msg)}`;
+}
+
+// ── DISCONTINUED ─────────────────────────────
+function toggleDiscont() {
+  const d = getLocal(), s = d.students.find(x => x.id === dStu);
+  if (!s) return;
+  s.status = s.status === 'discontinued' ? 'active' : 'discontinued';
+  saveData(d); // ← auto-saves to Firebase
+  renderSheet(); renderAdminStudents(); fillWhoDropdown();
+  toast(s.status === 'discontinued' ? '🚫 Marked discontinued' : '✅ Student reinstated');
+}
+
+// ── STUDENT SETUP (Admin) ────────────────────
+function saveSetup() {
+  const batch = document.getElementById('d-batch').value;
+  const fee   = parseInt(document.getElementById('d-fee').value);
+  const smo   = parseInt(document.getElementById('d-smo').value);
+  const err   = document.getElementById('setup-err');
+  if (!batch)          { err.textContent = 'Select a batch'; return; }
+  if (!fee || fee < 1) { err.textContent = 'Enter valid monthly fee'; return; }
+
+  const d = getLocal(), s = d.students.find(x => x.id === dStu);
+  s.batch       = batch;
+  s.monthlyFee  = fee;
+  s.status      = 'active';
+  // Preserve any existing payment records
+  const existing = s.months || {};
+  s.months = makeMonths(smo);
+  MONTHS.forEach(m => { if (existing[m] && existing[m].status !== 'na') s.months[m] = existing[m]; });
+
+  saveData(d); err.textContent = ''; // ← auto-saves to Firebase
+  renderSheet(); renderAdminStudents(); fillWhoDropdown();
+  // Auto-switch to fees tab so admin can see the months
+  switchDTab('fees');
+  toast('✅ Setup saved for ' + s.name);
+}
+
+function deleteStudent() {
+  if (!confirm('Delete ' + (getLocal().students.find(x => x.id === dStu) || {}).name + ' permanently?')) return;
+  const d = getLocal();
+  d.students = d.students.filter(x => x.id !== dStu);
+  saveData(d); // ← auto-saves to Firebase
+  document.getElementById('det-back').classList.remove('open');
+  renderAdminStudents(); fillWhoDropdown();
+  toast('🗑️ Student deleted');
+}
+
+// ── PROFILE EDIT (Admin) ─────────────────────
+const PROF = [
+  { key: 'name',             label: 'Full Name',   type: 'text'   },
+  { key: 'mobile',           label: 'Mobile',      type: 'tel'    },
+  { key: 'whatsapp',         label: 'WhatsApp',    type: 'tel'    },
+  { key: 'dob',              label: 'DOB',         type: 'date'   },
+  { key: 'age',              label: 'Age',         type: 'number' },
+  { key: 'bloodGroup',       label: 'Blood Group', type: 'select', opts: ['','A+','A-','B+','B-','AB+','AB-','O+','O-'] },
+  { key: 'batch',            label: 'Batch',       type: 'select', opts: ['', ...BATCHES] },
+  { key: 'guardian',         label: 'Guardian',    type: 'text'   },
+  { key: 'address',          label: 'Address',     type: 'text'   },
+  { key: 'emergencyContact', label: 'Emergency',   type: 'tel'    },
+];
+
+function renderProfFields(s) {
+  document.getElementById('prof-fields').innerHTML = PROF.map(f => {
+    if (f.type === 'select') {
+      return `<div class="ef-row"><span class="ef-lbl">${f.label}</span>
+        <select class="ef-sel" id="pf-${f.key}">
+          ${f.opts.map(o => `<option value="${o}" ${(s[f.key] || '') === o ? 'selected' : ''}>${o || '—'}</option>`).join('')}
+        </select></div>`;
+    }
+    return `<div class="ef-row"><span class="ef-lbl">${f.label}</span>
+      <input class="ef-inp" id="pf-${f.key}" type="${f.type}" value="${s[f.key] || ''}" placeholder="—"
+        inputmode="${f.type === 'tel' ? 'tel' : f.type === 'number' ? 'numeric' : 'text'}">
+    </div>`;
+  }).join('');
+}
+
+function saveProfile() {
+  const d = getLocal(), s = d.students.find(x => x.id === dStu);
+  const err = document.getElementById('prof-err');
+  PROF.forEach(f => { const el = document.getElementById('pf-' + f.key); if (el) s[f.key] = el.value.trim(); });
+  if (!s.name) { err.textContent = 'Name cannot be empty'; return; }
+  saveData(d); err.textContent = ''; // ← auto-saves to Firebase
+  document.getElementById('d-nm').textContent = s.name;
+  renderAdminStudents(); fillWhoDropdown();
+  toast('✅ Profile updated');
+}
+
+// ── STUDENT SCREEN ────────────────────────────
+let stuSel = new Set(), stuMode = 'Cash';
+
+function renderStudentScreen(id) {
+  const d = getLocal(), s = d.students.find(x => x.id === id);
+  if (!s) return;
+  stuSel = new Set(); stuMode = 'Cash';
+  document.getElementById('stu-nm').textContent = s.name;
+  document.getElementById('stu-bt').textContent =
+    '📚 ' + (s.batch || 'Batch not assigned yet') +
+    (s.bloodGroup ? ' · 🩸 ' + s.bloodGroup : '');
+  _renderStuSum(s); renderStuGrid(s); renderStuActions();
+}
+
+function _renderStuSum(s) {
+  document.getElementById('stu-sum').innerHTML = `
+    <div class="scard"><div class="sv" style="color:var(--red)">₹${fmt(calcDue(s))}</div><div class="sl">Due</div></div>
+    <div class="scard"><div class="sv" style="color:var(--orange)">₹${fmt(calcPend(s))}</div><div class="sl">Pending</div></div>
+    <div class="scard"><div class="sv" style="color:var(--green)">₹${fmt(calcPaid(s))}</div><div class="sl">Paid</div></div>
+  `;
+}
+
+function renderStuGrid(s) {
+  document.getElementById('stu-grid').innerHTML = MONTHS.map((m, mi) => {
+    const ms = s.months[m] || { status: 'na' };
+    if (ms.status === 'na')
+      return `<div class="mchip na"><div class="mn">${m}</div><div class="ms">Upcoming</div></div>`;
+
+    // Student can ONLY tap current month if it's due
+    const isCurrentMonth = (mi === CUR_MO);
+    const canTap = ms.status === 'due' && isCurrentMonth;
+    const sel    = stuSel.has(m) ? ' sel' : '';
+    const lbl    = ms.status === 'due' ? 'Due' : ms.status === 'pending' ? '⏳ Sent' : '✅ Paid';
+
+    return `<div class="mchip ${ms.status}${sel} ${canTap ? 'tappable' : ''}"
+      ${canTap ? `onclick="toggleStuChip('${m}')"` : ''}
+      style="${!canTap && ms.status !== 'na' ? 'cursor:default' : ''}">
+      <div class="mn">${m}</div>
+      <div class="ms">${lbl}</div>
+      ${ms.mode ? `<div class="mm">${ms.mode}</div>` : ''}
+      ${ms.status === 'due' && !isCurrentMonth ? `<div class="mm" style="color:var(--red);font-size:8px">See coach</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function toggleStuChip(m) {
+  stuSel.has(m) ? stuSel.delete(m) : stuSel.add(m);
+  const d = getLocal(), s = d.students.find(x => x.id === curStuId);
+  renderStuGrid(s); updateStuSelbar(); renderStuActions();
+}
+
+function updateStuSelbar() {
+  const bar = document.getElementById('stu-selbar'), n = stuSel.size;
+  n > 0
+    ? (bar.classList.add('show'), bar.textContent = n + ' month' + (n > 1 ? 's' : '') + ' selected')
+    : bar.classList.remove('show');
+}
+
+function renderStuActions() {
+  const area = document.getElementById('stu-action');
+  if (!stuSel.size) { area.innerHTML = ''; return; }
+  const d = getLocal(), s = d.students.find(x => x.id === curStuId);
+  const amt = (stuSel.size * (s?.monthlyFee || 0)).toLocaleString('en-IN');
+  area.innerHTML = `<div>
+    <div class="lbl" style="margin-bottom:7px">Payment Mode</div>
+    <div class="mrow" id="stu-modes">
+      <button class="mbtn sel" onclick="pickStuMode('Cash')">💵 Cash</button>
+      <button class="mbtn" onclick="pickStuMode('UPI')">📱 UPI</button>
+      <button class="mbtn" onclick="pickStuMode('Bank')">🏦 Bank</button>
+    </div>
+    <button class="btn btn-ora" style="margin-top:9px" onclick="stuMarkPaid()">
+      Mark Paid · ₹${amt}
+    </button>
+    <div style="text-align:center;font-size:11px;color:var(--muted);margin-top:7px">
+      🟠 Turns pending. Coach confirms → 🟢 Paid
+    </div>
+  </div>`;
+  refreshStuModeUI();
+}
+
+function pickStuMode(m) { stuMode = m; refreshStuModeUI(); }
+function refreshStuModeUI() {
+  const btns = document.querySelectorAll('#stu-modes .mbtn'), modes = ['Cash', 'UPI', 'Bank'];
+  if (btns.length) btns.forEach((b, i) => b.classList.toggle('sel', modes[i] === stuMode));
+}
+
+function stuMarkPaid() {
+  if (!stuSel.size) return;
+  const d = getLocal(), s = d.students.find(x => x.id === curStuId);
+  const n = stuSel.size;
+  stuSel.forEach(m => { s.months[m] = { status: 'pending', mode: stuMode, paidDate: today(), confirmedDate: null }; });
+  saveData(d); // ← auto-saves to Firebase — nothing else needed
+  stuSel = new Set();
+  renderStudentScreen(curStuId);
+  toast('⏳ ' + n + ' month' + (n > 1 ? 's' : '') + ' sent — coach will confirm');
+}
+
+// ── BACKUP / RESTORE ──────────────────────────
+function exportData() {
+  const blob = new Blob([JSON.stringify(getLocal(), null, 2)], { type: 'application/json' });
+  const url  = URL.createObjectURL(blob), a = document.createElement('a');
+  a.href = url; a.download = 'DCA_Backup_' + new Date().toISOString().slice(0, 10) + '.json';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+  toast('💾 Backup downloaded');
+}
+
+function importData(event) {
+  const file = event.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const d = JSON.parse(e.target.result);
+      if (!d.admin || !d.students) throw 0;
+      saveData(d); renderAdminDashboard(); fillWhoDropdown();
+      toast('✅ Data restored!');
+    } catch(e) { toast('❌ Invalid backup file'); }
+  };
+  reader.readAsText(file); event.target.value = '';
+}
+
+// ── TOAST ──────────────────────────────────────
+let _tt;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  clearTimeout(_tt); _tt = setTimeout(() => el.classList.remove('show'), 2800);
+}
+</script>
+</body>
+</html>
